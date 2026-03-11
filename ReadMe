@@ -1,0 +1,171 @@
+http://localhost:8083/parkingService/swagger-ui/index.html#/
+
+High-Level Design (HLD)
+1. Overview
+The Basic Parking System is a RESTful Spring Boot application that manages parking floors, spots, and vehicles. It supports parking and unparking vehicles, and can be extended for more features.
+2. Main Components
+Controller Layer: Exposes REST APIs for parking operations.
+Service Layer: Contains business logic for parking/unparking and lot management.
+Strategy Layer: Implements parking spot allocation strategies.
+Model Layer: Contains domain objects (Vehicle, ParkingSpot, ParkingFloor, VehicleType).
+3. Key Flows
+Initialize Lot: Create floors and spots with types.
+Park Vehicle: Find a suitable spot and generate a ticket.
+Unpark Vehicle: Free the spot using the ticket.
+
+Low-Level Design (LLD)
+1. Model Layer
+Vehicle
+Fields: regNumber, color, type (VehicleType)
+VehicleType
+Enum: CAR, BIKE, TRUCK
+ParkingSpot
+Fields: spotId, floorNumber, supportedType, isFree, parkedVehicle
+Methods: park(Vehicle), unpark(), isFree()
+ParkingFloor
+Fields: floorNum, List<parkingspot></parkingspot>
+Constructor: Initializes spots with types
+2. Service Layer
+ParkingService
+Fields: List<parkingfloor>, ParkingStrategy, ReentrantLock</parkingfloor>
+Methods:
+createLot(int floors, int spotsPerFloor)
+park(Vehicle): Finds spot, parks vehicle, returns ticket
+unpark(String ticket): Frees spot using ticket
+3. Strategy Layer
+ParkingStrategy (interface)
+Methods:
+findSpot(List<parkingfloor>, VehicleType): Finds available spot for type</parkingfloor>
+findSpotId(List<parkingfloor>, String spotId): Finds spot by ID</parkingfloor>
+FloorStrategyImpl
+Implements ParkingStrategy
+Logic for finding/freeing spots
+4. Controller Layer
+ParkingController
+Endpoints:
+POST /parking/init: Initialize lot
+POST /parking/park: Park vehicle
+(Extendable for /unpark)
+
+Relationships
+ParkingController → ParkingService → ParkingStrategy → ParkingFloor → ParkingSpot
+VehicleType is used by Vehicle and ParkingSpot
+
+
+Basic Parking System - Diagrams and Sequence Flows
+1. Component Diagram (High-Level)
++-------------------+        +-------------------+        +-------------------+
+|   Controller      |        |    Service        |        |    Strategy       |
+| (ParkingController|------->| (ParkingService)  |------->| (ParkingStrategy) |
++-------------------+        +-------------------+        +-------------------+
+                                                        |
+                                                        v
+                                                +-------------------+
+                                                |   Model Layer     |
+                                                | (ParkingFloor,    |
+                                                |  ParkingSpot,     |
+                                                |  Vehicle,         |
+                                                |  VehicleType)     |
+                                                +-------------------+
+2. Class Diagram (Core Classes)
++-------------------+        +-------------------+        +-------------------+
+|   ParkingService  |<>------|  ParkingFloor     |<>------|  ParkingSpot      |
+|-------------------|        |-------------------|        |-------------------|
+| - floors          |        | - floorNum        |        | - spotId          |
+| - strategy        |        | - spots           |        | - floorNumber     |
+| - lock            |        +-------------------+        | - supportedType   |
+|-------------------|                                   | - isFree          |
+| +createLot()      |                                   | - parkedVehicle   |
+| +park()           |                                   +-------------------+
+| +unpark()         |
++-------------------+
+        ^
+        |
+        |
++-------------------+
+| ParkingController |
++-------------------+
+
++-------------------+
+|   Vehicle         |
++-------------------+
+| - regNumber       |
+| - color           |
+| - type            |
++-------------------+
+
++-------------------+
+|  VehicleType      |
++-------------------+
+| CAR, BIKE, TRUCK  |
++-------------------+
+3. Sequence Diagram: Park Vehicle
+User
+ |
+ | 1. POST /parking/park (Vehicle)
+ v
+ParkingController
+ |
+ | 2. service.park(vehicle)
+ v
+ParkingService
+ |
+ | 3. strategy.findSpot(floors, vehicle.type)
+ v
+ParkingStrategy
+ |
+ | 4. (finds available spot)
+ v
+ParkingService
+ |
+ | 5. spot.park(vehicle)
+ v
+ParkingSpot
+ |
+ | 6. (marks spot as occupied)
+ v
+ParkingService
+ |
+ | 7. return ticket
+ v
+ParkingController
+ |
+ | 8. return ticket to user
+ v
+User
+4. Sequence Diagram: Unpark Vehicle
+User
+ |
+ | 1. POST /parking/unpark (ticket)
+ v
+ParkingController
+ |
+ | 2. service.unpark(ticket)
+ v
+ParkingService
+ |
+ | 3. Extract spotId from ticket
+ |
+ | 4. strategy.findSpotId(floors, spotId)
+ v
+ParkingStrategy
+ |
+ | 5. (finds spot by ID)
+ v
+ParkingService
+ |
+ | 6. spot.unpark()
+ v
+ParkingSpot
+ |
+ | 7. (marks spot as free)
+ v
+ParkingService
+ |
+ | 8. return confirmation
+ v
+ParkingController
+ |
+ | 9. return confirmation to user
+ v
+User
